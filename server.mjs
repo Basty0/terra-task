@@ -4,6 +4,9 @@ import { extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { loadEnvFile } from 'node:process'
+import { McpServer, createMcpHandler } from '@modelcontextprotocol/server'
+import { toNodeHandler } from '@modelcontextprotocol/node'
+import * as z from 'zod/v4'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 const publicDirectory = join(root, 'public')
@@ -240,6 +243,133 @@ function getBoard() {
   }
 }
 
+function validateTaskUpdates(updates) {
+  const allowedKeys = ['assigned_to', 'status', 'progress', 'priority', 'team_note', 'feature_url', 'branch_name']
+  if (Object.keys(updates).some((key) => !allowedKeys.includes(key))) {
+    return 'Certains champs ne peuvent pas être modifiés.'
+  }
+  if (updates.assigned_to !== undefined && updates.assigned_to !== null && !members.includes(updates.assigned_to)) {
+    return 'Choisissez un membre de l’équipe.'
+  }
+  if (updates.status !== undefined && !statuses.includes(updates.status)) {
+    return 'Choisissez un statut valide.'
+  }
+  if (updates.progress !== undefined && (!Number.isInteger(updates.progress) || updates.progress < 0 || updates.progress > 100 || updates.progress % 25 !== 0)) {
+    return 'La progression doit être comprise entre 0 et 100 %, par pas de 25 %.'
+  }
+  if (updates.priority !== undefined && (!Number.isInteger(updates.priority) || updates.priority < 0 || updates.priority > 3)) {
+    return 'La priorité doit être comprise entre 0 et 3.'
+  }
+  if (updates.team_note !== undefined && (typeof updates.team_note !== 'string' || updates.team_note.length > 2000)) {
+    return 'La note est limitée à 2 000 caractères.'
+  }
+  if (updates.feature_url !== undefined && (typeof updates.feature_url !== 'string' || updates.feature_url.length > 300)) {
+    return 'Le lien est limité à 300 caractères.'
+  }
+  if (updates.branch_name !== undefined && (typeof updates.branch_name !== 'string' || updates.branch_name.length > 200)) {
+    return 'Le nom de branche est limité à 200 caractères.'
+  }
+
+  return ''
+}
+
+function updateTask(requestCode, updates) {
+  const task = findTask.get(requestCode)
+  if (!task) {
+    return { error: 'Demande introuvable.' }
+  }
+  const validationError = validateTaskUpdates(updates)
+  if (validationError) {
+    return { error: validationError }
+  }
+
+  const allowedKeys = ['assigned_to', 'status', 'progress', 'priority', 'team_note', 'feature_url', 'branch_name']
+  const values = Object.fromEntries(allowedKeys.map((key) => [key, updates[key] !== undefined ? updates[key] : task[key]]))
+  if (values.status === 'done') values.progress = 100
+  const updateSql = allowedKeys.map((key) => `${key} = @${key}`).join(', ')
+  database.prepare(`UPDATE tasks SET ${updateSql}, updated_at = @updated_at WHERE request_code = @request_code`).run({
+    ...values,
+    updated_at: new Date().toISOString(),
+    request_code: requestCode,
+  })
+
+  return { task: findTask.get(requestCode) }
+}
+
+function taskMatchesSearch(task, search) {
+  if (!search) return true
+  const query = search.toLocaleLowerCase('fr')
+  return [task.request_code, task.requester_name, task.group_name, task.message_public, task.branch_name]
+    .some((value) => String(value ?? '').toLocaleLowerCase('fr').includes(query))
+}
+
+function mcpText(value) {
+  return { content: [{ type: 'text', text: JSON.stringify(value) }] }
+}
+
+const mcpHandler = createMcpHandler(() => {
+  const mcpServer = new McpServer({ name: 'terra-task', version: '1.0.0' })
+
+  mcpServer.registerTool('list_tasks', {
+    description: 'Liste et filtre les tickets Terra Task. Les statuts possibles sont to_analyze, todo, in_progress, done et abandoned.',
+    inputSchema: z.object({
+      assignee: z.enum(members).optional(),
+      status: z.enum(statuses).optional(),
+      search: z.string().max(200).optional(),
+      limit: z.number().int().min(1).max(100).default(100),
+    }),
+  }, async ({ assignee, status, search, limit }) => {
+    await syncRequests()
+    const tasks = findTasks.all()
+      .filter((task) => (!assignee || task.assigned_to === assignee)
+        && (!status || task.status === status)
+        && taskMatchesSearch(task, search))
+      .slice(0, limit)
+    return mcpText({ count: tasks.length, tasks })
+  })
+
+  mcpServer.registerTool('get_task', {
+    description: 'Récupère le détail complet d’un ticket à partir de son code, par exemple F12.',
+    inputSchema: z.object({ request_code: z.string().min(1).max(32) }),
+  }, async ({ request_code }) => {
+    const task = findTask.get(request_code)
+    if (!task) return mcpText({ error: 'Demande introuvable.' })
+    return mcpText({ task })
+  })
+
+  mcpServer.registerTool('update_task', {
+    description: 'Modifie un ticket Terra Task. Les champs sont facultatifs. Mettre assigned_to à null retire l’assignation. progress accepte 0, 25, 50, 75 ou 100. Mettre le statut done fixe la progression à 100.',
+    inputSchema: z.object({
+      request_code: z.string().min(1).max(32),
+      assigned_to: z.enum(members).nullable().optional(),
+      status: z.enum(statuses).optional(),
+      progress: z.number().int().min(0).max(100).refine((value) => value % 25 === 0, 'Pas de 25 %').optional(),
+      priority: z.number().int().min(0).max(3).optional(),
+      team_note: z.string().max(2000).optional(),
+      feature_url: z.string().max(300).optional(),
+      branch_name: z.string().max(200).optional(),
+    }).strict(),
+  }, async ({ request_code, ...updates }) => {
+    const result = updateTask(request_code, updates)
+    return mcpText(result)
+  })
+
+  mcpServer.registerTool('list_team_members', {
+    description: 'Liste les membres de l’équipe et le nombre de tickets qui leur sont assignés.',
+  }, async () => mcpText(getBoard().team))
+
+  mcpServer.registerTool('sync_tasks', {
+    description: 'Synchronise les tickets avec la plateforme Terra Nova, puis retourne le tableau actualisé.',
+  }, async () => {
+    await syncRequests()
+    const board = getBoard()
+    return mcpText({ total: board.stats.total, last_synced_at: board.last_synced_at, sync_error: board.sync_error })
+  })
+
+  return mcpServer
+}, { responseMode: 'json' })
+const handleMcpRequest = toNodeHandler(mcpHandler)
+
 async function readJson(request) {
   let body = ''
   for await (const chunk of request) {
@@ -269,6 +399,15 @@ const server = createServer(async (request, response) => {
   response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   const pathname = new URL(request.url, 'http://localhost').pathname
+  if (pathname === '/mcp') {
+    if (!requestHasTrustedOrigin(request)) {
+      sendJson(response, 403, { error: 'Origine non autorisée.' })
+      return
+    }
+    void handleMcpRequest(request, response)
+    return
+  }
+
   if (request.method === 'GET' && pathname === '/api/board') {
     await syncRequests()
     sendJson(response, 200, getBoard())
@@ -305,49 +444,12 @@ const server = createServer(async (request, response) => {
       return
     }
 
-    const allowedKeys = ['assigned_to', 'status', 'progress', 'priority', 'team_note', 'feature_url', 'branch_name']
-    if (Object.keys(updates).some((key) => !allowedKeys.includes(key))) {
-      sendJson(response, 422, { error: 'Certains champs ne peuvent pas être modifiés.' })
+    const result = updateTask(requestCode, updates)
+    if (result.error) {
+      sendJson(response, 422, { error: result.error })
       return
     }
-    if (updates.assigned_to !== undefined && updates.assigned_to !== null && !members.includes(updates.assigned_to)) {
-      sendJson(response, 422, { error: 'Choisissez un membre de l’équipe.' })
-      return
-    }
-    if (updates.status !== undefined && !statuses.includes(updates.status)) {
-      sendJson(response, 422, { error: 'Choisissez un statut valide.' })
-      return
-    }
-    if (updates.progress !== undefined && (!Number.isInteger(updates.progress) || updates.progress < 0 || updates.progress > 100 || updates.progress % 25 !== 0)) {
-      sendJson(response, 422, { error: 'La progression doit être comprise entre 0 et 100 %, par pas de 25 %.' })
-      return
-    }
-    if (updates.priority !== undefined && (!Number.isInteger(updates.priority) || updates.priority < 0 || updates.priority > 3)) {
-      sendJson(response, 422, { error: 'La priorité doit être comprise entre 0 et 3.' })
-      return
-    }
-    if (updates.team_note !== undefined && (typeof updates.team_note !== 'string' || updates.team_note.length > 2000)) {
-      sendJson(response, 422, { error: 'La note est limitée à 2 000 caractères.' })
-      return
-    }
-    if (updates.feature_url !== undefined && (typeof updates.feature_url !== 'string' || updates.feature_url.length > 300)) {
-      sendJson(response, 422, { error: 'Le lien est limité à 300 caractères.' })
-      return
-    }
-    if (updates.branch_name !== undefined && (typeof updates.branch_name !== 'string' || updates.branch_name.length > 200)) {
-      sendJson(response, 422, { error: 'Le nom de branche est limité à 200 caractères.' })
-      return
-    }
-
-    const values = Object.fromEntries(allowedKeys.map((key) => [key, updates[key] ?? task[key]]))
-    if (values.status === 'done') values.progress = 100
-    const updateSql = allowedKeys.map((key) => `${key} = @${key}`).join(', ')
-    database.prepare(`UPDATE tasks SET ${updateSql}, updated_at = @updated_at WHERE request_code = @request_code`).run({
-      ...values,
-      updated_at: new Date().toISOString(),
-      request_code: requestCode,
-    })
-    sendJson(response, 200, { task: findTask.get(requestCode) })
+    sendJson(response, 200, result)
     return
   }
 

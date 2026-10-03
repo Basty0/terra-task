@@ -10,5 +10,10 @@
   },
   "engines": {
     "node": ">=22.13"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.1",
+    "@modelcontextprotocol/server": "^2.3.0",
+    "zod": "^4.6.5"
   }
 }
