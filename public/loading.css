@@ -1,0 +1,41 @@
+.skeleton {
+  display: block;
+  overflow: hidden;
+  position: relative;
+  border-radius: 7px;
+  background: #eceef3;
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .72), transparent);
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+.skeleton-stat { width: 42px; height: 24px; }
+.skeleton-avatar { width: 43px; height: 43px; flex: none; border-radius: 14px; }
+.skeleton-copy { display: grid; flex: 1; gap: 8px; }
+.skeleton-line { width: 82%; height: 9px; }
+.skeleton-line-short { width: 48%; }
+.skeleton-line-medium { width: 65%; }
+.skeleton-xp { width: 48px; height: 26px; }
+.skeleton-column-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
+.skeleton-number { width: 25px; height: 25px; border-radius: 8px; }
+.skeleton-card { display: grid; align-content: start; gap: 12px; min-height: 104px; pointer-events: none; }
+.member-card.skeleton-card { display: flex; }
+.member-card:not(.skeleton-card) { width: 100%; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.member-card:not(.skeleton-card):hover,
+.member-card-selected { border-color: #c7c1fa; box-shadow: 0 0 0 2px rgba(111, 101, 218, .1); }
+.member-card:focus-visible { outline: 3px solid rgba(111, 101, 218, .35); outline-offset: 2px; }
+.board-unavailable { grid-column: 1 / -1; padding: 28px; color: #8b93a3; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation-duration: 3s; }
+}

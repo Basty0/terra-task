@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#10172a" />
+    <meta name="description" content="Le tableau partagé de l'équipe Terra Nova." />
+    <title>Terra Task — Webcup</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/branches.css" />
+    <link rel="stylesheet" href="/details.css" />
+    <link rel="stylesheet" href="/loading.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Terra Task, accueil">
+          <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+          <span class="brand-copy"><strong>terra<span>task</span></strong><small>WEB CUP 2026</small></span>
+        </a>
+        <div class="topbar-right">
+          <div class="sync-label"><span class="live-dot"></span><span id="connection-label">Connexion en cours</span></div>
+          <button class="button button-light" id="sync-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.6 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.4-3" /></svg>
+            <span>Synchroniser</span>
+          </button>
+          <div class="avatar avatar-top" title="Équipe Faly, Stephano, Djaffar">FS<span>D</span></div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="hero-row">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> ESPACE ÉQUIPE <span class="eyebrow-line"></span></div>
+            <h1>On avance <em>ensemble.</em></h1>
+            <p class="hero-description">Les demandes de Terra Nova, du premier brief à la fonctionnalité livrée.</p>
+          </div>
+          <div class="wave-card">
+            <div class="wave-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M5 14l4-4 3 3 7-8M16 5h3v3" /></svg></div>
+            <div><span class="wave-caption">PROCHAINE VAGUE</span><strong id="next-wave">En attente</strong><small id="wave-meta">Les infos arriveront depuis l’API</small></div>
+            <span class="wave-chevron">↗</span>
+          </div>
+        </section>
+
+        <section class="stats-grid" aria-label="Résumé des tâches">
+          <article class="stat-card stat-primary"><span class="stat-label">DEMANDES REÇUES</span><div class="stat-bottom"><strong id="stat-total">—</strong><span class="stat-icon stat-icon-purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /></svg></span></div><span class="stat-foot">Issues du flux Terra Nova</span></article>
+          <article class="stat-card"><span class="stat-label">EN COURS</span><div class="stat-bottom"><strong id="stat-progress">—</strong><span class="stat-icon stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg></span></div><span class="stat-foot">La prochaine étape est en marche</span></article>
+          <article class="stat-card"><span class="stat-label">TERMINÉES</span><div class="stat-bottom"><strong id="stat-done">—</strong><span class="stat-icon stat-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></span></div><span class="stat-foot"><b id="stat-xp-done">0 XP</b> gagnés par l’équipe</span></article>
+          <article class="stat-card stat-xp"><span class="stat-label">XP À PRENDRE</span><div class="stat-bottom"><strong id="stat-xp-available">—</strong><span class="stat-icon stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18m5-14H9.5a3.5 3.5 0 0 0 0 7H14a3 3 0 0 1 0 6H6" /></svg></span></div><span class="stat-foot">XP disponibles sur le board</span></article>
+        </section>
+
+        <section class="team-section">
+          <div class="section-heading"><div><h2>L’équipe <span class="heading-count" id="team-count">03</span></h2><p>La vue d’ensemble, sans se marcher dessus.</p></div><span class="team-presence"><span></span> 3 membres actifs</span></div>
+          <div class="team-grid" id="team-grid"></div>
+        </section>
+
+        <section class="board-section">
+          <div class="section-heading board-heading"><div><h2>Le board <span class="heading-count" id="board-count">0</span></h2><p>Priorisées par XP · les demandes viennent de l’API officielle.</p></div><div class="filters">
+            <label class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="search-input" type="search" placeholder="Rechercher…" aria-label="Rechercher une tâche" /></label>
+            <select id="member-filter" aria-label="Filtrer par membre"><option value="">Toute l’équipe</option></select>
+            <select id="difficulty-filter" aria-label="Filtrer par difficulté"><option value="">Toute difficulté</option><option>Facile</option><option>Moyenne</option><option>Difficile</option><option>Expert</option></select>
+          </div></div>
+          <div class="board-scroll"><div class="kanban" id="kanban"></div></div>
+          <div class="empty-setup" id="setup-notice" hidden><div class="setup-icon">✳</div><div><strong>Le board attend le flux Terra Nova.</strong><p>Ajoutez votre clé API dans le fichier <code>.env</code> à côté du serveur, puis redémarrez-le. Les demandes apparaîtront automatiquement ici.</p></div><span class="setup-chip">API SÉCURISÉE CÔTÉ SERVEUR</span></div>
+          <div class="empty-setup empty-error" id="error-notice" hidden><div class="setup-icon">!</div><div><strong>Synchronisation momentanément indisponible.</strong><p id="error-message"></p></div></div>
+        </section>
+        <footer class="page-footer"><span>Terra Task <span class="footer-dot">·</span> Un petit pas pour l’équipe, un grand pas pour Terra Nova.</span><span id="last-sync">En attente de la première synchronisation</span></footer>
+      </main>
+    </div>
+
+    <dialog class="detail-dialog" id="task-dialog">
+      <form method="dialog" class="dialog-top"><div><span class="dialog-code" id="dialog-code">F00</span><span class="difficulty-pill" id="dialog-difficulty">Moyenne</span><span class="detail-group" id="dialog-group">Socle</span></div><button class="close-button" aria-label="Fermer">×</button></form>
+      <div class="dialog-content" id="dialog-content"></div>
+    </dialog>
+  </body>
+</html>

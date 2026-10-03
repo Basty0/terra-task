@@ -1,0 +1,29 @@
+.branch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: #f4f3ff;
+  color: #7268d1;
+}
+
+.branch-glyph {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.branch-name {
+  min-width: 0;
+  overflow: hidden;
+  font: 600 8px ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-hint {
+  color: #9aa1af;
+  font-size: 8px;
+  font-weight: 400;
+}
