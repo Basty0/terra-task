@@ -1,0 +1,11 @@
+{
+  "mode": "node",
+  "runtime": "node:22",
+  "build": "",
+  "startup": "server.cjs",
+  "persist": ["data/"],
+  "env": {
+    "required": ["WEBCUP_API_KEY"]
+  },
+  "keepReleases": 5
+}
